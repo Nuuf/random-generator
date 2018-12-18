@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+
+<head>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO"
+        crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+        crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+        crossorigin="anonymous"></script>
+
+    <script>
+
+        'use strict';
+
+        $(function () {
+
+            var PREMADES = {};
+
+            var $newListButton = $('#newListButton');
+            var $generateButton = $('#generateButton');
+            var $loadPremadeInput = $('#loadPremadeInput');
+            var $listContainer = $('#listContainer');
+            var $output = $('#output');
+
+            var $DUMMY1 = $('<DUMMY></DUMMY>');
+            var $DUMMY2 = $('<DUMMY></DUMMY>');
+
+            var arr = [];
+
+            var insertHere = null;
+
+
+            $newListButton.on('click', function () {
+
+                new List(arr, $listContainer, null, insertHere);
+
+            });
+
+            $generateButton.on('click', function () {
+
+                Generate();
+
+            });
+
+            $loadPremadeInput.on('change', function (event) {
+                var file = event.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function (event) {
+                        console.log(event.target.result);
+                        var content = JSON.parse(event.target.result);
+                        for (var key in content) {
+
+                            if (PREMADES[key] != null) {
+                                throw new Error('KEY DUPLICATE');
+                            } else {
+                                PREMADES[key] = content[key];
+                            }
+
+                        }
+                        AppendPremades();
+                    };
+                    reader.readAsText(file);
+                }
+            });
+
+
+            function List(arr, parent, premade, sibling) {
+
+                var _this = this;
+
+                arr.push(this);
+
+                this.arr = arr;
+
+                this.parent = parent;
+
+                this.container = $([
+                    '<div class="container-fluid" style="margin-top: 5px;" draggable="true">',
+                    '   <div class="input-group">',
+                    '       <div class="input-group-prepend">',
+                    '           <button type="button" class="btn btn-danger delete-btn">DELETE</button>',
+                    '           <button type="button" class="btn btn-danger insert-here-btn">INSERT</button>',
+                    '       </div>',
+                    '       <textarea class="form-control a-list"></textarea>',
+                    '   </div>',
+                    '</div>'
+                ].join(''));
+
+                this.container.on('dragstart', function (event) {
+                    event.originalEvent.dataTransfer.setData('arrIndex', _this.arr.indexOf(_this));
+                });
+
+                this.container.on('drop', function (event) {
+                    event.originalEvent.preventDefault();
+                    var prevVal = _this.textArea.val();
+                    var incoming = _this.arr[event.originalEvent.dataTransfer.getData('arrIndex')];
+                    var incomingVal = incoming.textArea.val();
+                    incoming.textArea.val(prevVal);
+                    _this.textArea.val(incomingVal);
+                });
+
+                this.container.on('dragover', function (event) {
+                    event.originalEvent.preventDefault();
+                });
+
+                this.deleteButton = this.container.find('.delete-btn');
+                this.insertHereButton = this.container.find('.insert-here-btn');
+
+                this.insertHereButton.on('click', function () {
+
+                    var ihbtns = _this.parent.find('.insert-here-btn');
+
+                    ihbtns.each(function (index, btn) {
+                        $(btn).removeClass('btn-warning').addClass('btn-danger');
+                    });
+
+                    if (insertHere === _this.container) {
+                        insertHere = null;
+                    } else {
+                        _this.insertHereButton.removeClass('btn-danger').addClass('btn-warning');
+                        insertHere = _this.container;
+                    }
+
+
+                });
+
+                this.textArea = this.container.find('.a-list');
+
+                this.deleteButton.on('click', function () {
+
+                    _this.container.remove();
+                    _this.arr.splice(_this.arr.indexOf(_this), 1);
+
+                    if (insertHere === _this.container) {
+                        insertHere = null;
+                    }
+
+                });
+
+                if (sibling) {
+                    sibling.after(this.container);
+                } else {
+                    this.parent.append(this.container);
+                }
+
+
+                if (premade) {
+
+                    this.textArea.val(premade);
+
+                }
+
+            }
+            List.prototype = Object.create(null);
+            List.prototype.constructor = List;
+
+            function Generate() {
+
+                var $lists = $listContainer.find('.a-list');
+
+                var mapped = $lists.map(function () {
+                    return Check(this.value);
+                }).get();
+
+                $output.val(mapped.join(' '));
+
+            }
+
+            function Check(_string) {
+
+                var parts = _string.split(',');
+
+                if (parts.length > 1) {
+
+                    _string = parts[RandomInteger(0, parts.length - 1)];
+
+                }
+
+                var m = _string.match(/(\d+\-\d+)/g);
+                if (!m) return _string;
+                var l = m.length;
+
+                for (var i = 0; i < l; ++i) {
+
+                    var split = m[i].split('-');
+
+                    var min = parseInt(split[0]);
+                    var max = parseInt(split[1]);
+
+                    var rand = RandomInteger(min, max);
+
+                    _string = _string.replace(/(\d+\-\d+)/, rand);
+
+                }
+
+                return _string;
+
+            }
+
+            function RandomInteger(min, max) {
+
+                return (Math.random() * (max - min + 1) + min) | 0;
+
+            }
+
+            function AppendPremades() {
+                var $premadeButtonsContainer = $('.premade-btns');
+                $premadeButtonsContainer.empty();
+                for (var key in PREMADES) {
+
+                    $premadeButtonsContainer.append('<button class="dropdown-item premade-type" type="button">' + key + '</button>');
+
+                }
+                $('.premade-type').off('click').on('click', OnPremadeClick);
+            }
+
+            function OnPremadeClick(event) {
+                new List(arr, $listContainer, PREMADES[event.target.innerHTML].join(','), insertHere);
+            }
+
+        });
+
+    </script>
+</head>
+
+<body>
+    <div class="container-fluid" style="margin-top: 5px;">
+        <div class="btn-group" role="group" aria-label="Basic example">
+            <button id="newListButton" type="button" class="btn btn-primary">NEW LIST</button>
+            <button id="generateButton" type="button" class="btn btn-success">GENERATE OUTPUT</button>
+            <div class="btn-group" role="group">
+                <button id="btnGroupDrop1" type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown"
+                    aria-haspopup="true" aria-expanded="false">
+                    NEW PREMADE LIST
+                </button>
+                <div class="dropdown-menu premade-btns" aria-labelledby="btnGroupDrop1">
+                </div>
+            </div>
+            <div class="input-group mb-3">
+                <div class="custom-file">
+                    <input type="file" class="custom-file-input" id="loadPremadeInput">
+                    <label class="custom-file-label" for="loadPremadeInput">LOAD PREMADE</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid" style="margin-top: 5px;">
+        <div class="input-group">
+            <div class="input-group-prepend">
+                <span class="input-group-text">OUTPUT</span>
+            </div>
+            <textarea id="output" class="form-control" aria-label="OUTPUT" disabled></textarea>
+        </div>
+    </div>
+    <div id="listContainer">
+    </div>
+</body>
